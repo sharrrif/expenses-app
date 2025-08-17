@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>مدير المصروفات اليومية</title>
+<style>
+  :root{
+    --bg:#0f172a;           /* slate-900 */
+    --panel:#111827;        /* gray-900 */
+    --muted:#1f2937;        /* gray-800 */
+    --text:#e5e7eb;         /* gray-200 */
+    --accent:#22c55e;       /* green-500 */
+    --danger:#ef4444;       /* red-500 */
+    --warn:#f59e0b;         /* amber-500 */
+    --border:#374151;       /* gray-700 */
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Naskh Arabic UI", "Noto Sans Arabic", Arial, sans-serif;
+    background:linear-gradient(180deg,var(--bg),#050816);
+    color:var(--text);
+    min-height:100vh;
+  }
+  header{
+    position:sticky; top:0; z-index:10;
+    backdrop-filter: blur(8px);
+    background:rgba(17,24,39,.7);
+    border-bottom:1px solid var(--border);
+    padding:12px 16px;
+    display:flex; gap:12px; align-items:center; justify-content:space-between;
+  }
+  header h1{margin:0; font-size:18px; font-weight:700; letter-spacing:.3px}
+  .container{max-width:1100px; margin:16px auto; padding:0 16px 24px}
+  .grid{display:grid; gap:16px}
+  @media(min-width:900px){ .grid{ grid-template-columns: 370px 1fr } }
+
+  .card{
+    background: radial-gradient(1200px 300px at 100% 0%, rgba(34,197,94,.05), rgba(0,0,0,0)) , var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px; padding:16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  }
+  .card h2{margin:0 0 12px 0; font-size:16px}
+  label{display:block; font-size:12px; margin:8px 0 6px 0; opacity:.9}
+  input, select, textarea{
+    width:100%; background:#0b1220; color:var(--text);
+    border:1px solid var(--border); border-radius:10px;
+    padding:10px 12px; outline:none;
+  }
+  input:focus, select:focus, textarea:focus{ border-color: var(--accent); box-shadow: 0 0 0 3px rgba(34,197,94,.15) }
+  .row{display:grid; gap:8px; grid-template-columns: 1fr 1fr}
+  .actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+  button{
+    border:1px solid var(--border); background:#0b1220; color:var(--text); padding:10px 12px; border-radius:10px; cursor:pointer;
+  }
+  button.primary{background:var(--accent); color:#062b13; border-color:transparent; font-weight:700}
+  button.warn{background:var(--warn); color:#2a1900; border-color:transparent}
+  button.danger{background:var(--danger); color:#2a0707; border-color:transparent}
+  .stat{
+    display:flex; align-items:center; justify-content:space-between;
+    border:1px dashed var(--border);
+    background:linear-gradient(180deg,#0b1220, #0a1020);
+    padding:10px 12px; border-radius:12px; margin-bottom:8px;
+  }
+  .muted{opacity:.8; font-size:12px}
+  table{width:100%; border-collapse:collapse; margin-top:10px}
+  thead th{
+    position:sticky; top:0; background:#0b1220; border-bottom:1px solid var(--border);
+    padding:10px; font-size:12px; text-align:right;
+  }
+  tbody td{border-bottom:1px dashed #233; padding:10px; font-size:13px; vertical-align:top}
+  .empty{padding:12px; text-align:center; opacity:.7}
+  .pill{
+    font-size:11px; padding:4px 8px; border-radius:999px; border:1px solid var(--border); background:#0b1220;
+  }
+  footer{opacity:.7; font-size:12px; text-align:center; padding:18px}
+  canvas{width:100%; height:240px; background:#0b1220; border:1px solid var(--border); border-radius:12px}
+  .badge{font-size:11px; border:1px solid var(--border); padding:4px 8px; border-radius:8px; margin-inline-start:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>💸 مدير المصروفات اليومية</h1>
+  <div>
+    <button id="btnExportCSV" class="badge">تصدير CSV</button>
+    <label class="badge" style="cursor:pointer">
+      استيراد JSON<input type="file" id="importFile" accept=".json" hidden />
+    </label>
+    <button id="btnReset" class="badge">تهيئة</button>
+  </div>
+</header>
+
+<div class="container grid">
+  <!-- الإدخال -->
+  <section class="card">
+    <h2>إضافة مصروف</h2>
+    <div class="row">
+      <div>
+        <label>التاريخ</label>
+        <input type="date" id="date" />
+      </div>
+      <div>
+        <label>المبلغ (ريال)</label>
+        <input type="number" id="amount" min="0" step="0.01" placeholder="0.00" />
+      </div>
+    </div>
+    <label>البند</label>
+    <input id="item" placeholder="مثال: قهوة، بقالة، مواصلات…" />
+    <div class="row">
+      <div>
+        <label>التصنيف</label>
+        <select id="category">
+          <option>أكل وشرب</option>
+          <option>قهوة</option>
+          <option>بقالة</option>
+          <option>مواصلات</option>
+          <option>سكن/فواتير</option>
+          <option>ترفيه</option>
+          <option>صحة</option>
+          <option>تعليم</option>
+          <option>أخرى</option>
+        </select>
+      </div>
+      <div>
+        <label>طريقة الدفع</label>
+        <select id="method">
+          <option>نقدي</option>
+          <option>بطاقة</option>
+          <option>تحويل</option>
+          <option>محفظة</option>
+        </select>
+      </div>
+    </div>
+    <label>ملاحظات</label>
+    <textarea id="note" rows="2" placeholder="معلومة إضافية (اختياري)"></textarea>
+    <div class="actions">
+      <button class="primary" id="btnAdd">إضافة</button>
+      <button id="btnToday">اليوم</button>
+      <button id="btnClearForm">مسح الحقول</button>
+    </div>
+    <div class="muted" style="margin-top:6px">يتم الحفظ تلقائيًا على هذا الجهاز (localStorage).</div>
+  </section>
+
+  <!-- التقارير -->
+  <section class="card">
+    <h2>نظرة عامة</h2>
+
+    <div class="row" style="grid-template-columns: 1fr 1fr 1fr">
+      <div class="stat"><span>اليوم</span><strong id="sumDay">0</strong></div>
+      <div class="stat"><span>هذا الأسبوع</span><strong id="sumWeek">0</strong></div>
+      <div class="stat"><span>هذا الشهر</span><strong id="sumMonth">0</strong></div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>تصفية حسب الفترة</label>
+        <div class="row">
+          <input type="date" id="fromDate">
+          <input type="date" id="toDate">
+        </div>
+      </div>
+      <div>
+        <label>بحث بالكلمة</label>
+        <input id="search" placeholder="ابحث في البند/الملاحظات">
+      </div>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button id="btnFilter">تطبيق التصفية</button>
+      <button id="btnClearFilter">إلغاء التصفية</button>
+    </div>
+
+    <h2 style="margin-top:16px">توزيع التصنيفات</h2>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <!-- السجل -->
+  <section class="card" style="grid-column: 1 / -1">
+    <h2>السجل</h2>
+    <div class="muted">اضغط على أي صف للتعديل، أو على (🗑️) للحذف.</div>
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>التاريخ</th>
+          <th>البند</th>
+          <th>التصنيف</th>
+          <th>المبلغ</th>
+          <th>طريقة الدفع</th>
+          <th>ملاحظات</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr class="empty"><td colspan="8">لا يوجد بيانات بعد.</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<footer>صُمم للعمل دون اتصال • تخزين محلي • تصدير/استيراد</footer>
+
+<script>
+  // ---------- Utilities ----------
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const LS_KEY = "expenses.v1";
+  const fmt = n => Number(n||0).toLocaleString('ar-EG', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  function todayStr(){
+    const d = new Date();
+    const off = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - off*60000);
+    return local.toISOString().slice(0,10);
+  }
+  function parseDate(s){ return new Date(s + "T00:00:00"); }
+  function weekStart(d){ const x = new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
+  function monthStart(d){ const x = new Date(d.getFullYear(), d.getMonth(), 1); x.setHours(0,0,0,0); return x; }
+
+  function load(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch{ return []; } }
+  function save(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
+
+  // ---------- State ----------
+  let data = load();
+  let filter = {from:null, to:null, q:""};
+
+  // ---------- Form helpers ----------
+  $("#btnToday").onclick = () => $("#date").value = todayStr();
+  $("#btnClearForm").onclick = () => (["date","amount","item","note"].forEach(id=>$("#"+id).value=""));
+
+  $("#btnAdd").onclick = () => {
+    const rec = {
+      id: crypto.randomUUID(),
+      date: $("#date").value || todayStr(),
+      amount: parseFloat($("#amount").value || "0"),
+      item: ($("#item").value || "").trim() || "—",
+      category: $("#category").value,
+      method: $("#method").value,
+      note: ($("#note").value || "").trim()
+    };
+    if(!(rec.amount>0)){ alert("رجاءً أدخل مبلغًا صحيحًا."); return; }
+    data.push(rec); save(data);
+    render();
+    $("#amount").value=""; $("#item").value=""; $("#note").value="";
+  };
+
+  // ---------- Table ----------
+  function renderTable(rows){
+    const tb = $("#tbody");
+    if(!rows.length){ tb.innerHTML = '<tr class="empty"><td colspan="8">لا يوجد بيانات بعد.</td></tr>'; return; }
+    tb.innerHTML = "";
+    rows.forEach((r, i)=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${r.date}</td>
+        <td>${escapeHtml(r.item)}</td>
+        <td><span class="pill">${escapeHtml(r.category)}</span></td>
+        <td><strong>${fmt(r.amount)}</strong></td>
+        <td>${escapeHtml(r.method)}</td>
+        <td>${escapeHtml(r.note||"")}</td>
+        <td>
+          <button data-edit="${r.id}">✏️</button>
+          <button data-del="${r.id}" class="danger">🗑️</button>
+        </td>`;
+      tb.appendChild(tr);
+    });
+    // actions
+    $$("button[data-del]").forEach(btn => btn.onclick = ()=>{
+      if(confirm("حذف هذا السجل؟")){ data = data.filter(x=>x.id!==btn.dataset.del); save(data); render(); }
+    });
+    $$( "button[data-edit]" ).forEach(btn => btn.onclick = ()=> openEditor(btn.dataset.edit));
+  }
+
+  function openEditor(id){
+    const r = data.find(x=>x.id===id); if(!r) return;
+    const dlg = document.createElement("dialog");
+    dlg.style.cssText = "border:none;border-radius:12px;padding:0;max-width:520px;width:92%";
+    dlg.innerHTML = `
+      <form method="dialog" style="background:#0b1220;color:#e5e7eb;border:1px solid #374151;border-radius:12px;padding:16px">
+        <h3 style="margin-top:0">تعديل السجل</h3>
+        <label>التاريخ</label><input type="date" id="e_date" value="${r.date}">
+        <label>المبلغ</label><input type="number" id="e_amount" min="0" step="0.01" value="${r.amount}">
+        <label>البند</label><input id="e_item" value="${escapeAttr(r.item)}">
+        <div class="row">
+          <div><label>التصنيف</label>
+            <select id="e_category">${$("#category").innerHTML}</select>
+          </div>
+          <div><label>طريقة الدفع</label>
+            <select id="e_method">${$("#method").innerHTML}</select>
+          </div>
+        </div>
+        <label>ملاحظات</label><textarea id="e_note" rows="2">${escapeHtml(r.note||"")}</textarea>
+        <div class="actions" style="margin-top:12px">
+          <button value="cancel">إلغاء</button>
+          <button class="primary" value="ok">حفظ</button>
+        </div>
+      </form>`;
+    document.body.appendChild(dlg);
+    $("#e_category", dlg).value = r.category;
+    $("#e_method", dlg).value = r.method;
+    dlg.showModal();
+    dlg.addEventListener("close", ()=>{
+      if(dlg.returnValue==="ok"){
+        r.date = $("#e_date", dlg).value || r.date;
+        r.amount = parseFloat($("#e_amount", dlg).value || r.amount);
+        r.item = $("#e_item", dlg).value || r.item;
+        r.category = $("#e_category", dlg).value;
+        r.method = $("#e_method", dlg).value;
+        r.note = $("#e_note", dlg).value;
+        save(data); render();
+      }
+      dlg.remove();
+    });
+    function $(sel,root){ return (root||document).querySelector(sel); }
+  }
+
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+
+  // ---------- Filters ----------
+  $("#btnFilter").onclick = ()=>{
+    filter.from = $("#fromDate").value || null;
+    filter.to = $("#toDate").value || null;
+    filter.q = ($("#search").value||"").toLowerCase().trim();
+    render();
+  };
+  $("#btnClearFilter").onclick = ()=>{
+    filter = {from:null, to:null, q:""};
+    $("#fromDate").value=""; $("#toDate").value=""; $("#search").value="";
+    render();
+  };
+
+  // ---------- Export / Import / Reset ----------
+  $("#btnExportCSV").onclick = ()=>{
+    const rows = toRows(filtered());
+    const csv = "التاريخ,البند,التصنيف,المبلغ,طريقة الدفع,ملاحظات\n" + rows.map(r=>r.join(",")).join("\n");
+    triggerDownload("expenses.csv", csv);
+  };
+  $("#importFile").onchange = e => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try{
+        const arr = JSON.parse(evt.target.result);
+        if(!Array.isArray(arr)) throw "bad";
+        data = arr; save(data); render();
+        alert("تم الاستيراد بنجاح ✅");
+      }catch{
+        alert("صيغة الملف غير صحيحة.");
+      }
+    };
+    reader.readAsText(f);
+    e.target.value="";
+  };
+  $("#btnReset").onclick = ()=>{
+    if(confirm("سيتم مسح جميع البيانات المخزنة على هذا الجهاز. متأكد؟")){
+      localStorage.removeItem(LS_KEY);
+      data = []; render();
+    }
+  };
+
+  // ---------- Stats ----------
+  function calcSums(arr){
+    const now = new Date();
+    const t = parseDate(todayStr());
+    const ws = weekStart(now);
+    const ms = monthStart(now);
+    let sd=0, sw=0, sm=0;
+    arr.forEach(r=>{
+      const d = parseDate(r.date);
+      if(+d===+t) sd += r.amount;
+      if(d>=ws) sw += r.amount;
+      if(d>=ms) sm += r.amount;
+    });
+    $("#sumDay").textContent = fmt(sd);
+    $("#sumWeek").textContent = fmt(sw);
+    $("#sumMonth").textContent = fmt(sm);
+  }
+
+  // ---------- Chart (vanilla canvas pie) ----------
+  function drawChart(arr){
+    const catTotals = {};
+    arr.forEach(r=>{ catTotals[r.category] = (catTotals[r.category]||0) + r.amount; });
+    const entries = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+    const canvas = $("#chart");
+    const ctx = canvas.getContext("2d");
+    // Resize for DPR
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0,0,w,h);
+    // Empty
+    const total = entries.reduce((s, [,v])=>s+v,0);
+    if(total<=0){
+      ctx.fillStyle = "#9ca3af";
+      ctx.textAlign = "center"; ctx.font = "14px system-ui";
+      ctx.fillText("لا توجد بيانات كافية للرسم.", w/2, h/2);
+      return;
+    }
+    // Generate deterministic colors from string
+    function colorFor(str){
+      let hash=0; for(let i=0;i<str.length;i++) hash = str.charCodeAt(i) + ((hash<<5)-hash);
+      const hue = Math.abs(hash)%360;
+      return `hsl(${hue} 70% 50%)`;
+    }
+    // Pie
+    const cx = w/2, cy = h/2, R = Math.min(w,h)*0.38;
+    let ang = -Math.PI/2;
+    entries.forEach(([k,v])=>{
+      const portion = v/total;
+      const a2 = ang + portion*2*Math.PI;
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,R,ang,a2);
+      ctx.closePath();
+      ctx.fillStyle = colorFor(k);
+      ctx.fill();
+      // label
+      const mid = (ang+a2)/2;
+      const lx = cx + Math.cos(mid)*(R+14);
+      const ly = cy + Math.sin(mid)*(R+14);
+      ctx.fillStyle = "#e5e7eb";
+      ctx.font = "12px system-ui";
+      const pct = Math.round(portion*100);
+      ctx.textAlign = lx<cx? "right":"left";
+      ctx.fillText(`${k} (${pct}%)`, lx, ly);
+      ang = a2;
+    });
+  }
+
+  // ---------- Helpers ----------
+  function filtered(){
+    let arr = [...data];
+    if(filter.from){ const f = parseDate(filter.from); arr = arr.filter(r=>parseDate(r.date) >= f); }
+    if(filter.to){ const t = parseDate(filter.to); arr = arr.filter(r=>parseDate(r.date) <= t); }
+    if(filter.q){ arr = arr.filter(r=>(r.item+r.note).toLowerCase().includes(filter.q)); }
+    // sort desc by date then id
+    arr.sort((a,b)=> (a.date<b.date?1:-1) || (a.id<b.id?1:-1) );
+    return arr;
+  }
+
+  function toRows(arr){
+    return arr.map(r=>[r.date, safeCSV(r.item), safeCSV(r.category), r.amount, safeCSV(r.method), safeCSV(r.note||"")]);
+  }
+  function safeCSV(s){
+    s = String(s??"");
+    if(/[",\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+    return s;
+  }
+  function triggerDownload(filename, content){
+    const blob = new Blob([content], {type:"text/plain;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }
+
+  // ---------- Render ----------
+  function render(){
+    const arr = filtered();
+    renderTable(arr);
+    calcSums(data);
+    drawChart(arr);
+  }
+
+  // ---------- Init ----------
+  (function init(){
+    // set defaults
+    $("#date").value = todayStr();
+    render();
+  })();
+</script>
+</body>
+</html>
